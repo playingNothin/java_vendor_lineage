@@ -42,12 +42,51 @@ lineage_generator {
     ],
 }
 
+// Moto G20 (java): arm32 twin of generated_kernel_includes. The arm64
+// generation installs ARCH=arm64 UAPI whose asm/sigcontext.h uses
+// __uint128_t; when a 32-bit vendor compile receives usr/include it
+// shadows bionic's asm-arm headers and fails to build. Generating the
+// same header set with ARCH=arm yields a 32-bit-safe UAPI, so the
+// generated_kernel_headers wrapper below selects the right generation
+// per multilib variant (headers_install never invokes the target
+// compiler, so the arm64 CROSS_COMPILE embedded in
+// $(KERNEL_CROSS_COMPILE) is harmless here).
+lineage_generator {
+    name: "generated_kernel_includes_arm32",
+
+    cmd: "$(PATH_OVERRIDE_SOONG) $(KERNEL_MAKE_CMD) $(KERNEL_MAKE_FLAGS) -C $(TARGET_KERNEL_SOURCE) O=$(KERNEL_BUILD_OUT_PREFIX)$(genDir) ARCH=arm $(KERNEL_CROSS_COMPILE) headers_install",
+
+    export_include_dirs: [
+        "usr/audio/include/uapi",
+        "usr/include",
+        "usr/include/audio",
+        "usr/include/audio/include/uapi",
+        "usr/techpack/audio/include",
+    ],
+
+    dep_root: "$(TARGET_KERNEL_SOURCE)",
+    dep_files: [
+        "Makefile",
+        "include/**/*",
+        "arch/arm/include/**/*",
+        "techpack/audio/include/**/*",
+    ],
+}
+
 cc_library_headers {
     name: "generated_kernel_headers",
-    generated_headers: ["generated_kernel_includes"],
-    export_generated_headers: ["generated_kernel_includes"],
     vendor_available: true,
     recovery_available: true,
+    multilib: {
+        lib64: {
+            generated_headers: ["generated_kernel_includes"],
+            export_generated_headers: ["generated_kernel_includes"],
+        },
+        lib32: {
+            generated_headers: ["generated_kernel_includes_arm32"],
+            export_generated_headers: ["generated_kernel_includes_arm32"],
+        },
+    },
 }
 
 // Target platform agnostic config modules
